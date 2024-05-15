@@ -1,6 +1,6 @@
 import { todolistsAPI, TodolistType } from '../../api/todolists-api'
 import { Dispatch } from 'redux'
-import { setStatusLoading, setStatusLoadingType } from '../../app/app-reducer'
+import { setAppError, setAppErrorType, setStatusLoading, setStatusLoadingType } from '../../app/app-reducer'
 
 const initialState: Array<TodolistDomainType> = []
 
@@ -63,10 +63,14 @@ export const addTodolistTC = (title: string) => {
             .then((res) => {
                 if (res.data.resultCode === 0) {
                     dispatch(addTodolistAC(res.data.data.item))
-                    dispatch(setStatusLoading('succeeded'))
                 } else {
-                    alert('Too much symbols!!!')
+                    if (res.data.messages.length) {
+                        dispatch(setAppError(res.data.messages[0]))
+                    } else {
+                        dispatch(setAppError('Something went wrong'))
+                    }
                 }
+                dispatch(setStatusLoading('succeeded'))
             })
     }
 }
@@ -92,6 +96,8 @@ type ActionsType =
     | ReturnType<typeof changeTodolistFilterAC>
     | SetTodolistsActionType
     | setStatusLoadingType
+    | setAppErrorType
+
 export type FilterValuesType = 'all' | 'active' | 'completed';
 export type TodolistDomainType = TodolistType & {
     filter: FilterValuesType
