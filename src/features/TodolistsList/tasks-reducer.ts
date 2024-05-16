@@ -2,7 +2,8 @@ import { AddTodolistActionType, RemoveTodolistActionType, SetTodolistsActionType
 import { TaskPriorities, TaskStatuses, TaskType, todolistsAPI, UpdateTaskModelType } from '../../api/todolists-api'
 import { Dispatch } from 'redux'
 import { AppRootStateType } from '../../app/store'
-import { setStatusLoading, setStatusLoadingType } from '../../app/app-reducer'
+import { setAppError, setAppErrorType, setStatusLoading, setStatusLoadingType } from '../../app/app-reducer'
+import { handleNetworkError, serverNetworkError } from '../../utils/error-utils'
 
 const initialState: TasksStateType = {}
 
@@ -72,10 +73,17 @@ export const addTaskTC = (title: string, todolistId: string) => (dispatch: Dispa
     dispatch(setStatusLoading('loading'))
     todolistsAPI.createTask(todolistId, title)
         .then(res => {
-            const task = res.data.data.item
-            const action = addTaskAC(task)
-            dispatch(action)
-            dispatch(setStatusLoading('succeeded'))
+            if (res.data.resultCode === 0) {
+                const task = res.data.data.item
+                const action = addTaskAC(task)
+                dispatch(action)
+                dispatch(setStatusLoading('succeeded'))
+            } else {
+                serverNetworkError(dispatch, res.data)
+            }
+        })
+        .catch(e => {
+            handleNetworkError(dispatch, e)
         })
 }
 export const updateTaskTC = (taskId: string, domainModel: UpdateDomainTaskModelType, todolistId: string) =>
@@ -103,9 +111,20 @@ export const updateTaskTC = (taskId: string, domainModel: UpdateDomainTaskModelT
 
         todolistsAPI.updateTask(todolistId, taskId, apiModel)
             .then(res => {
-                const action = updateTaskAC(taskId, domainModel, todolistId)
-                dispatch(action)
-                dispatch(setStatusLoading('succeeded'))
+                if (res.data.resultCode === 0) {
+                    const action = updateTaskAC(taskId, domainModel, todolistId)
+                    dispatch(action)
+                    dispatch(setStatusLoading('succeeded'))
+                } else {
+                    if (res.data.messages.length) {
+                        dispatch(setAppError(res.data.messages[0]))
+                    } else {
+                        dispatch(setAppError('Something went wrong'))
+                    }
+                }
+            })
+            .catch((e) => {
+                dispatch(setAppError(e.message))
             })
     }
 
@@ -130,3 +149,4 @@ type ActionsType =
     | SetTodolistsActionType
     | ReturnType<typeof setTasksAC>
     | setStatusLoadingType
+    | setAppErrorType
