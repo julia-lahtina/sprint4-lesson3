@@ -1,8 +1,8 @@
-import { AddTodolistActionType, RemoveTodolistActionType, SetTodolistsActionType } from './todolists-reducer'
+import { AddTodolistActionType, RemoveTodolistActionType, SetTodolistsActionType, setEntityStatusType } from './todolists-reducer'
 import { TaskPriorities, TaskStatuses, TaskType, todolistsAPI, UpdateTaskModelType } from '../../api/todolists-api'
 import { Dispatch } from 'redux'
 import { AppRootStateType } from '../../app/store'
-import { setAppError, setAppErrorType, setStatusLoading, setStatusLoadingType } from '../../app/app-reducer'
+import { RequestStatusType, setAppError, setAppErrorType, setStatusLoading, setStatusLoadingType } from '../../app/app-reducer'
 import { handleNetworkError, serverNetworkError } from '../../utils/error-utils'
 
 const initialState: TasksStateType = {}
@@ -12,7 +12,7 @@ export const tasksReducer = (state: TasksStateType = initialState, action: Actio
         case 'REMOVE-TASK':
             return { ...state, [action.todolistId]: state[action.todolistId].filter(t => t.id !== action.taskId) }
         case 'ADD-TASK':
-            return { ...state, [action.task.todoListId]: [action.task, ...state[action.task.todoListId]] }
+            return { ...state, [action.task.todoListId]: [{ ...action.task, entityTaskStatus: 'idle' }, ...state[action.task.todoListId]] }
         case 'UPDATE-TASK':
             return {
                 ...state,
@@ -33,7 +33,13 @@ export const tasksReducer = (state: TasksStateType = initialState, action: Actio
             return copyState
         }
         case 'SET-TASKS':
-            return { ...state, [action.todolistId]: action.tasks }
+            return {
+                ...state, [action.todolistId]: action.tasks.map(t => ({ ...t, entityTaskStatus: 'idle' }))
+            }
+        case 'SET_ENTITY_TASK_TYPE':
+            return {
+                ...state, [action.todolistId]: state[action.todolistId].map(t => t.id === action.taskId ? { ...t, entityTaskStatus: action.taskStatus } : t)
+            }
         default:
             return state
     }
@@ -48,25 +54,35 @@ export const updateTaskAC = (taskId: string, model: UpdateDomainTaskModelType, t
     ({ type: 'UPDATE-TASK', model, todolistId, taskId } as const)
 export const setTasksAC = (tasks: Array<TaskType>, todolistId: string) =>
     ({ type: 'SET-TASKS', tasks, todolistId } as const)
+export const setEntityTaskStatus = (todolistId: string, taskId: string, taskStatus: RequestStatusType) =>
+    ({ type: 'SET_ENTITY_TASK_TYPE', todolistId, taskId, taskStatus } as const)
+
 
 // thunks
 export const fetchTasksTC = (todolistId: string) => (dispatch: Dispatch<ActionsType>) => {
     dispatch(setStatusLoading('loading'))
     todolistsAPI.getTasks(todolistId)
-        .then((res) => {
+        .then(res => {
             const tasks = res.data.items
             const action = setTasksAC(tasks, todolistId)
             dispatch(action)
             dispatch(setStatusLoading('succeeded'))
         })
+        .catch((e) => {
+            handleNetworkError(dispatch, e)
+        })
 }
 export const removeTaskTC = (taskId: string, todolistId: string) => (dispatch: Dispatch<ActionsType>) => {
     dispatch(setStatusLoading('loading'))
+    dispatch(setEntityTaskStatus(todolistId, taskId, 'loading'))
     todolistsAPI.deleteTask(todolistId, taskId)
         .then(res => {
             const action = removeTaskAC(taskId, todolistId)
             dispatch(action)
             dispatch(setStatusLoading('succeeded'))
+        })
+        .catch((e) => {
+            handleNetworkError(dispatch, e)
         })
 }
 export const addTaskTC = (title: string, todolistId: string) => (dispatch: Dispatch<ActionsType>) => {
@@ -110,21 +126,17 @@ export const updateTaskTC = (taskId: string, domainModel: UpdateDomainTaskModelT
         }
 
         todolistsAPI.updateTask(todolistId, taskId, apiModel)
-            .then(res => {
+            .then((res) => {
                 if (res.data.resultCode === 0) {
                     const action = updateTaskAC(taskId, domainModel, todolistId)
                     dispatch(action)
                     dispatch(setStatusLoading('succeeded'))
                 } else {
-                    if (res.data.messages.length) {
-                        dispatch(setAppError(res.data.messages[0]))
-                    } else {
-                        dispatch(setAppError('Something went wrong'))
-                    }
+                    serverNetworkError(dispatch, res.data)
                 }
             })
             .catch((e) => {
-                dispatch(setAppError(e.message))
+                handleNetworkError(dispatch, e)
             })
     }
 
@@ -150,3 +162,4 @@ type ActionsType =
     | ReturnType<typeof setTasksAC>
     | setStatusLoadingType
     | setAppErrorType
+    | ReturnType<typeof setEntityTaskStatus>

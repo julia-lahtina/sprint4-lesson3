@@ -74,6 +74,8 @@ export const Todolist = React.memo(function (props: PropsType) {
                     removeTask={props.removeTask}
                     changeTaskTitle={props.changeTaskTitle}
                     changeTaskStatus={props.changeTaskStatus}
+                    disable={props.entityStatus === 'loading'}
+                    entityTaskStatus={t.entityTaskStatus}
                 />)
             }
         </div>

@@ -1,6 +1,7 @@
 import { todolistsAPI, TodolistType } from '../../api/todolists-api'
 import { Dispatch } from 'redux'
 import { RequestStatusType, setAppError, setAppErrorType, setStatusLoading, setStatusLoadingType } from '../../app/app-reducer'
+import { handleNetworkError } from '../../utils/error-utils'
 
 const initialState: Array<TodolistDomainType> = []
 
@@ -39,6 +40,7 @@ export const changeTodolistFilterAC = (id: string, filter: FilterValuesType) => 
 export const setTodolistsAC = (todolists: Array<TodolistType>) => ({ type: 'SET-TODOLISTS', todolists } as const)
 export const setEntityStatus = (id: string, entityStatus: RequestStatusType) => ({ type: 'SET-ENTITY-STATUS', id, entityStatus } as const)
 
+
 // thunks
 export const fetchTodolistsTC = () => {
     return (dispatch: Dispatch<ActionsType>) => {
@@ -46,6 +48,9 @@ export const fetchTodolistsTC = () => {
             .then((res) => {
                 dispatch(setStatusLoading('succeeded'))
                 dispatch(setTodolistsAC(res.data))
+            })
+            .catch((e) => {
+                handleNetworkError(dispatch, e)
             })
     }
 }
@@ -59,8 +64,7 @@ export const removeTodolistTC = (todolistId: string) => {
                 dispatch(removeTodolistAC(todolistId))
             })
             .catch((e) => {
-                dispatch(setAppError(e.message))
-                dispatch(setStatusLoading('failed'))
+                handleNetworkError(dispatch, e)
                 dispatch(setEntityStatus(todolistId, 'idle'))
             })
     }
@@ -81,6 +85,9 @@ export const addTodolistTC = (title: string) => {
                 }
                 dispatch(setStatusLoading('succeeded'))
             })
+            .catch((e) => {
+                handleNetworkError(dispatch, e)
+            })
     }
 }
 export const changeTodolistTitleTC = (id: string, title: string) => {
@@ -90,6 +97,9 @@ export const changeTodolistTitleTC = (id: string, title: string) => {
             .then((res) => {
                 dispatch(changeTodolistTitleAC(id, title))
                 dispatch(setStatusLoading('succeeded'))
+            })
+            .catch((e) => {
+                handleNetworkError(dispatch, e)
             })
     }
 }
